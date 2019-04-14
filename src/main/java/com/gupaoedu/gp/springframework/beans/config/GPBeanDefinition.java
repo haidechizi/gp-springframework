@@ -3,9 +3,12 @@ package com.gupaoedu.gp.springframework.beans.config;
 public class GPBeanDefinition {
 
     private String beanClassName;
-    private boolean lazyInif = false;
+    private boolean lazyInit = false;
 
     private String factoryBeanName;
+
+
+    private boolean singleton;
 
     public String getBeanClassName() {
         return beanClassName;
@@ -15,12 +18,12 @@ public class GPBeanDefinition {
         this.beanClassName = beanClassName;
     }
 
-    public boolean isLazyInif() {
-        return lazyInif;
+    public boolean isLazyInit() {
+        return lazyInit;
     }
 
-    public void setLazyInif(boolean lazyInif) {
-        this.lazyInif = lazyInif;
+    public void setLazyInit(boolean lazyInit) {
+        this.lazyInit = lazyInit;
     }
 
     public String getFactoryBeanName() {
@@ -29,5 +32,13 @@ public class GPBeanDefinition {
 
     public void setFactoryBeanName(String factoryBeanName) {
         this.factoryBeanName = factoryBeanName;
+    }
+
+    public boolean isSingleton() {
+        return singleton;
+    }
+
+    public void setSingleton(boolean singleton) {
+        this.singleton = singleton;
     }
 }

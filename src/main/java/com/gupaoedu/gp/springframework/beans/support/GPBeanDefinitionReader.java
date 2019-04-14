@@ -21,7 +21,9 @@ public class GPBeanDefinitionReader {
 
 
     public GPBeanDefinitionReader(String... configLocations) {
-        InputStream is = this.getClass().getClassLoader().getResourceAsStream(configLocations[0].replace("classpath", ""));
+        String configLocation = configLocations[0].replace("classpath:", "");
+        InputStream is = this.getClass().getResourceAsStream("/" + configLocation);
+        //InputStream is = this.getClass().getClassLoader().getResourceAsStream(configLocation);
 
         try {
             properties.load(is);
@@ -41,8 +43,9 @@ public class GPBeanDefinitionReader {
 
     private void doScanner(String sacnPackage) {
 
-        String filesDir = sacnPackage.replace("\\.", "/");
-        URL url = this.getClass().getClassLoader().getResource("/" + filesDir);
+        String filesDir = sacnPackage.replace(".", "/");
+        //URL url = this.getClass().getClassLoader().getResource("/" + filesDir);
+        URL url = this.getClass().getResource("/" + filesDir);
         File file = new File(url.getFile());
         for (File f : file.listFiles()) {
             if (f.isDirectory()) {
@@ -69,6 +72,7 @@ public class GPBeanDefinitionReader {
 
                 }
                 beanDefinitions.add(doCreateBeanDefinition(toLowerCaseFirst(clazz.getSimpleName()), clazz));
+                beanDefinitions.add(doCreateBeanDefinition(className, clazz));
 
                 for (Class<?> i : clazz.getInterfaces()) {
                     beanDefinitions.add(doCreateBeanDefinition(i.getName(), clazz));
