@@ -9,6 +9,10 @@ public class GPHandlerMapping {
     private Method method;
     private Pattern pattern;
 
+    public GPHandlerMapping() {
+
+    }
+
     public GPHandlerMapping(Object controller, Method method, Pattern pattern) {
         this.controller = controller;
         this.method = method;

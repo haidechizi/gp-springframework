@@ -17,4 +17,14 @@ public class TestServiceImpl implements ITestService {
         name = testDao.test(name);
         return "Hello " + name;
     }
+
+    @Override
+    public String test1(String name) {
+        System.out.println("接收到请求 test1：" + name);
+        if("ex".equals(name)) {
+            throw new RuntimeException("测试异常");
+        }
+        name = testDao.test(name);
+        return "Hello " + name;
+    }
 }

@@ -4,15 +4,22 @@ import com.gupaoedu.gp.springframework.annotation.GPAutowired;
 import com.gupaoedu.gp.springframework.annotation.GPComponent;
 import com.gupaoedu.gp.springframework.annotation.GPController;
 import com.gupaoedu.gp.springframework.annotation.GPService;
+import com.gupaoedu.gp.springframework.aop.GPAopProxy;
+import com.gupaoedu.gp.springframework.aop.GPCglibAopProxy;
+import com.gupaoedu.gp.springframework.aop.GPJdkDynamicAopProxy;
+import com.gupaoedu.gp.springframework.aop.config.GPAopConfig;
+import com.gupaoedu.gp.springframework.aop.support.GPAdvisedSupport;
 import com.gupaoedu.gp.springframework.beans.GPBeanWrapper;
 import com.gupaoedu.gp.springframework.beans.config.GPBeanDefinition;
 import com.gupaoedu.gp.springframework.beans.support.GPBeanDefinitionReader;
 import com.gupaoedu.gp.springframework.beans.support.GPDefaultListableBeanFactory;
 import com.gupaoedu.gp.springframework.core.GPBeanFactory;
+import sun.net.ftp.FtpClient;
 
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -79,22 +86,25 @@ public class GPApplicationContext extends GPDefaultListableBeanFactory implement
         }
 
         //1、初始化
-        Object instance = instantiateBean(beanName, this.beanDefinitionMap.get(beanName));
-        GPBeanWrapper beanWrapper = new GPBeanWrapper(instance);
         if (this.factoryBeanInstanceCache.containsKey(beanName)) {
-            throw new Exception(beanName + " is exists");
+            return this.factoryBeanInstanceCache.get(beanName).getWrapperInstance();
         }
-        this.factoryBeanInstanceCache.put(beanName, beanWrapper);
+        GPBeanWrapper beanWrapper = instantiateBean(beanName, this.beanDefinitionMap.get(beanName));
+
 
         //2、注入
         populateBean(beanName, new GPBeanDefinition(), beanWrapper);
 
 
-        return instance;
+        return beanWrapper.getWrapperInstance();
     }
 
     private void populateBean(String beanName, GPBeanDefinition gpBeanDefinition, GPBeanWrapper gpBeanWrapper) throws Exception {
         Class<?> clazz = gpBeanWrapper.getWrapperClass();
+        if(gpBeanWrapper.getWrapperTargetInstance() != null) {
+            clazz = gpBeanWrapper.getWrapperTargetInstance().getClass();
+        }
+
         // 只注入有注解的类
         if (clazz.isAnnotationPresent(GPController.class) || clazz.isAnnotationPresent(GPService.class)
                 || clazz.isAnnotationPresent(GPComponent.class)) {
@@ -108,25 +118,65 @@ public class GPApplicationContext extends GPDefaultListableBeanFactory implement
                 if ("".equals(fieldName)) {
                     fieldName = field.getName();
                 }
-                Object instance = this.singletonBeanMap.get(fieldName);
-                if (instance == null) {
-                    continue;
+                Object instance = null;
+                GPBeanWrapper beanWrapper = this.factoryBeanInstanceCache.get(fieldName);
+                if(beanWrapper != null) {
+                    instance = beanWrapper.getWrapperInstance();
                 }
-                field.set(gpBeanWrapper.getWrapperInstance(), instance);
+                if (instance == null) {
+                    instance = getBean(field.getType());
+                    //continue;
+                }
+                field.setAccessible(true);
+                field.set(gpBeanWrapper.getWrapperTargetInstance(), instance);
             }
         }
 
     }
 
-    private Object instantiateBean(String beanName, GPBeanDefinition gpBeanDefinition) throws Exception {
+    private GPBeanWrapper instantiateBean(String beanName, GPBeanDefinition gpBeanDefinition) throws Exception {
         String clazzName = gpBeanDefinition.getBeanClassName();
         Class<?> clazz = Class.forName(clazzName);
+
         Object instance = clazz.newInstance();
+        GPAdvisedSupport config = instantionAopConfig(gpBeanDefinition);
+        config.setTargetClass(clazz);
+        config.setTarget(instance);
+
+        GPBeanWrapper beanWrapper = new GPBeanWrapper();
+        beanWrapper.setWrapperTargetInstance(instance);
+        if (config.pointMatch()) {
+            instance = createProxy(config).getProxy();
+        }
+
         if (gpBeanDefinition.isSingleton()) {
             this.singletonBeanMap.put(beanName, instance);
         }
+        beanWrapper.setWrapperInstance(instance);
 
-        return instance;
+        this.factoryBeanInstanceCache.put(beanName,beanWrapper);
+        //this.factoryBeanInstanceCache.put(clazzName,beanWrapper);
+
+        return beanWrapper;
+    }
+
+    private GPAopProxy createProxy(GPAdvisedSupport config) {
+        if (config.getTargetClass().getInterfaces().length > 0) {
+            return new GPJdkDynamicAopProxy(config);
+        } else {
+            return new GPCglibAopProxy(config);
+        }
+    }
+
+    private GPAdvisedSupport instantionAopConfig(GPBeanDefinition gpBeanDefinition) {
+        GPAopConfig aopConfig = new GPAopConfig();
+        aopConfig.setPointCut(this.getConfig().getProperty("pointCut"));
+        aopConfig.setAspectAfter(this.getConfig().getProperty("aspectAfter"));
+        aopConfig.setAspectAfterThrowing(this.getConfig().getProperty("aspectAfterThrow"));
+        aopConfig.setAspectBefore(this.getConfig().getProperty("aspectBefore"));
+        aopConfig.setAspectClass(this.getConfig().getProperty("aspectClass"));
+        aopConfig.setThrowingName(this.getConfig().getProperty("aspectAfterThrowingName"));
+        return new GPAdvisedSupport(aopConfig);
     }
 
     @Override
@@ -142,5 +192,9 @@ public class GPApplicationContext extends GPDefaultListableBeanFactory implement
     @Override
     public int beanDefinitionNamesCount() {
         return this.beanDefinitionMap.keySet().size();
+    }
+
+    public Properties getConfig() {
+        return reader.getConfig();
     }
 }
